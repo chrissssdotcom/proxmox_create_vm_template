@@ -55,7 +55,7 @@ create_template() {
   virt-customize -a "$img_name" --install qemu-guest-agent
   qm create "$vmid" --name "$templ_name" --memory $MEM --net0 virtio,bridge=$NET_BRIDGE
   qm importdisk "$vmid" "$img_name" $DISK_STOR
-  qm set "$vmid" --scsihw virtio-scsi-pci --scsi0 $DISK_STOR:vm-$vmid-disk-0
+  qm set "$vmid" --ide1 $DISK_STOR:vm-$vmid-disk-0
   qm set "$vmid" --ide2 $DISK_STOR:cloudinit
   qm set "$vmid" --boot c --bootdisk scsi0
   qm set "$vmid" --ipconfig0 ip=dhcp
