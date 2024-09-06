@@ -3,7 +3,7 @@
 # Define variables
 MEM=2048              # Amount of RAM in MB
 NET_BRIDGE="vmbr0"    # Network bridge, e.g., vmbr0
-DISK_STOR="local-lvm" # Disk storage, e.g., local-lvm
+DISK_STOR="local" # Disk storage, e.g., local-lvm
 CPU_CORES=2           # Number of CPU cores
 DISK_SIZE="32G"       # Disk size
 CLOUD_DIR="/var/lib/vz/cloudready"  # Directory to store images
