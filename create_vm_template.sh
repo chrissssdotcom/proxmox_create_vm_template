@@ -10,7 +10,7 @@ CLOUD_DIR="/var/lib/vz/cloudready"  # Directory to store images
 
 # List of image URLs to download
 IMAGES_URLS=(
-  "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+  "https://mirror.aarnet.edu.au/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud.latest.x86_64.qcow2"
   "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
   "https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img"
   # Add more images here
