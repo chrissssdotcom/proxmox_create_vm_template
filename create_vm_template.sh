@@ -17,7 +17,7 @@ IMAGES_URLS=(
 )
 
 # Initialize unique VMID
-START_VMID=9001
+START_VMID=10000
 
 # Download images if they do not exist
 mkdir -p "$CLOUD_DIR"
@@ -58,7 +58,6 @@ create_template() {
   qm set "$vmid" --scsihw virtio-scsi-pci --scsi0 $DISK_STOR:vm-$vmid-disk-0
   qm set "$vmid" --ide2 $DISK_STOR:cloudinit
   qm set "$vmid" --boot c --bootdisk scsi0
-  qm set "$vmid" --serial0 socket --vga serial0
   qm set "$vmid" --ipconfig0 ip=dhcp
   qm set "$vmid" --cores $CPU_CORES
   qm resize "$vmid" scsi0 $DISK_SIZE
