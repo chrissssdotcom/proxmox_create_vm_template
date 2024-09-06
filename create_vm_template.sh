@@ -1,28 +1,99 @@
 #!/bin/bash
 
-# Define variables
-MEM=2048              # Amount of RAM in MB
-NET_BRIDGE="vmbr0"    # Network bridge, e.g., vmbr0
-DISK_STOR="local-lvm" # Disk storage, e.g., local-lvm
-CPU_CORES=2           # Number of CPU cores
-DISK_SIZE="32G"       # Disk size
-CLOUD_DIR="/var/lib/vz/cloudready"  # Directory to store images
+# Ensure dialog is installed
+if ! command -v dialog &> /dev/null
+then
+    echo "Dialog could not be found, installing..."
+    apt-get update && apt-get install -y dialog
+fi
 
-# List of image URLs to download
+# Function to list network bridges
+list_bridges() {
+  echo $(brctl show | awk 'NR>1 {print $1}')
+}
+
+# Function to list available storages
+list_storages() {
+  echo $(pvesm status | awk 'NR>1 {print $1}')
+}
+
+# Define cloud directory
+CLOUD_DIR="/var/lib/vz/cloudready"
+
+# List of predefined image URLs to download
 IMAGES_URLS=(
-  "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
-  "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
-  "https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img"
-  # Add more images here
+  "Rocky Linux 9:https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+  "Debian 12:https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+  "Ubuntu 22.04:https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img"
 )
 
 # Initialize unique VMID
 START_VMID=9001
 
-# Download images if they do not exist
+# Request RAM in GB using dialog
+dialog --inputbox "Enter RAM size (GB):" 8 40 2>ram_input.txt
+MEM_GB=$(cat ram_input.txt)
+MEM=$((MEM_GB * 1024))  # Convert to MB
+rm ram_input.txt
+
+# List network bridges and choose one
+BRIDGES=$(list_bridges)
+dialog --menu "Select Network Bridge" 15 40 6 $(for bridge in $BRIDGES; do echo "$bridge - $bridge"; done) 2>net_bridge.txt
+NET_BRIDGE=$(cat net_bridge.txt)
+rm net_bridge.txt
+
+# List available storage and choose one
+STORAGES=$(list_storages)
+dialog --menu "Select Disk Storage" 15 40 6 $(for storage in $STORAGES; do echo "$storage - $storage"; done) 2>disk_storage.txt
+DISK_STOR=$(cat disk_storage.txt)
+rm disk_storage.txt
+
+# Request disk size using dialog
+dialog --inputbox "Enter Disk Size (e.g., 32G):" 8 40 2>disk_size.txt
+DISK_SIZE=$(cat disk_size.txt)
+rm disk_size.txt
+
+# Request CPU cores using dialog
+dialog --inputbox "Enter number of CPU cores:" 8 40 2>cpu_cores.txt
+CPU_CORES=$(cat cpu_cores.txt)
+rm cpu_cores.txt
+
+# Show a dialog with checkboxes to select predefined images to download
+IMAGE_OPTIONS=()
+for img in "${IMAGES_URLS[@]}"; do
+  IMAGE_OPTIONS+=("$(echo "$img" | cut -d':' -f1)" "Download" "off")
+done
+
+dialog --checklist "Select images to download:" 15 40 6 "${IMAGE_OPTIONS[@]}" 2>selected_images.txt
+SELECTED_IMAGES=$(cat selected_images.txt)
+rm selected_images.txt
+
+# Allow user to input a custom qcow2 image URL
+dialog --inputbox "Enter a custom qcow2 image URL (leave empty if none):" 8 40 2>custom_image.txt
+CUSTOM_IMAGE_URL=$(cat custom_image.txt)
+rm custom_image.txt
+
+# Create a list of image URLs to download based on the selection
+IMAGES_TO_DOWNLOAD=()
+
+# Map the selected images back to URLs
+for img_name in $SELECTED_IMAGES; do
+  for img in "${IMAGES_URLS[@]}"; do
+    if [[ "$img" == "$img_name:"* ]]; then
+      IMAGES_TO_DOWNLOAD+=("$(echo "$img" | cut -d':' -f2)")
+    fi
+  done
+done
+
+# Add the custom image URL if provided
+if [[ -n "$CUSTOM_IMAGE_URL" ]]; then
+  IMAGES_TO_DOWNLOAD+=("$CUSTOM_IMAGE_URL")
+fi
+
+# Download selected images if they do not exist
 mkdir -p "$CLOUD_DIR"
 
-for IMG_URL in "${IMAGES_URLS[@]}"; do
+for IMG_URL in "${IMAGES_TO_DOWNLOAD[@]}"; do
   IMG_PATH="$CLOUD_DIR/$(basename $IMG_URL)"
   if [ ! -f "$IMG_PATH" ]; then
     wget -P "$CLOUD_DIR" "$IMG_URL"
@@ -58,7 +129,8 @@ create_template() {
   qm set "$vmid" --scsihw virtio-scsi-pci --scsi0 $DISK_STOR:vm-$vmid-disk-0
   qm set "$vmid" --ide2 $DISK_STOR:cloudinit
   qm set "$vmid" --boot c --bootdisk scsi0
-  qm set "$vmid" --serial0 socket --vga serial0
+  qm set "$vmid" --vga std   # Default VGA display output
+  qm set "$vmid" --serial0 socket  # Serial port for future usage but not main display
   qm set "$vmid" --ipconfig0 ip=dhcp
   qm set "$vmid" --cores $CPU_CORES
   qm resize "$vmid" scsi0 $DISK_SIZE
@@ -67,14 +139,14 @@ create_template() {
 }
 
 # Create templates for all downloaded images
-for IMG_URL in "${IMAGES_URLS[@]}"; do
+for IMG_URL in "${IMAGES_TO_DOWNLOAD[@]}"; do
   IMG_PATH="$CLOUD_DIR/$(basename $IMG_URL)"
   create_template "$IMG_PATH" "$START_VMID"
   START_VMID=$((START_VMID + 1)) # Increment VMID for the next machine
 done
 
-# Remove downloaded images after creating templates
-for IMG_URL in "${IMAGES_URLS[@]}"; do
+# Optionally remove downloaded images after creating templates
+for IMG_URL in "${IMAGES_TO_DOWNLOAD[@]}"; do
   IMG_PATH="$CLOUD_DIR/$(basename $IMG_URL)"
   rm -f "$IMG_PATH"
 done
