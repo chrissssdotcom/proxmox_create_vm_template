@@ -4,7 +4,7 @@
 MEMORY=2048
 CORES=2
 BRIDGE="vmbr0"
-STORAGE="loca-lvm"  # Change to your storage choice
+STORAGE="local-lvm"  # Change to your storage choice
 DISK_SIZE="16G"  # Desired disk size after expansion
 
 # Array of VM details: (VM_ID, VM_NAME, IMG_URL)
